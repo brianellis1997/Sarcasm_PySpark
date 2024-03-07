@@ -14,6 +14,9 @@ natural language processing techniques to aid performance (Verma et al. 2021). D
 attempts, there is still a need for further research and implementation in this area.
 ## Goals
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 700d14f88ecea099f1e25ae4705d4c96b4a4df4f
 - Implement traditional machine learning models e.g. Logistic regression, Random Forest, Support Vector Machines towards sarcasm detection (random forest and svm not possible with traditional compute (takes hours))
 - Possible voting classifier combining predictions of multiple traditional models
 - Deep learning methods for sarcasm detection (LSTM, CNN, CNN+LSTM)
