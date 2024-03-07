@@ -13,4 +13,8 @@ forward networks, RNNs, CNN’s, Transformers, as well as hybrid models that use
 natural language processing techniques to aid performance (Verma et al. 2021). Despite these
 attempts, there is still a need for further research and implementation in this area.
 ## Goals
+- Implement traditional machine learning models e.g. Logistic regression, Random Forest, Support Vector Machines towards sarcasm detection (random forest and svm not possible with traditional compute (takes hours))
+- Possible voting classifier combining predictions of multiple traditional models
+- Deep learning methods for sarcasm detection (LSTM, CNN, CNN+LSTM)
+## Inference
 It would be nice to quantify the model's confidence in it's classification. For example, instead of outputting binary sarcastic labels, it can give probabilistic estimates such as 70% sarcasm.
