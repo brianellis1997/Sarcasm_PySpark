@@ -562,99 +562,45 @@ train_df, val_df = combined_df.randomSplit([0.8, 0.2], seed=22)
 
 # In[ ]:
 
-# Train Logistic Regression on Best lambda value found from hyperparameter tuning
 
 from pyspark.ml.classification import LogisticRegression
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
-# Initialize the logistic regression model with the best regularization parameter
-lr = LogisticRegression(featuresCol='features', labelCol='label', regParam=0.1)
+# Initialize the logistic regression model
+lr = LogisticRegression(featuresCol='features', labelCol='label')
 
-# Fit the model on your training data
-lrModel = lr.fit(train_df)
-
-# Predict on the validation data
-predictions = lrModel.transform(val_df)
-
-# Evaluate the model's performance using accuracy
-accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-accuracy = accuracy_evaluator.evaluate(predictions)
-print(f"Validation accuracy with regParam=0.1: {accuracy}")
-
-# Test accuracy
+# Define a parameter grid to search over
+paramGrid = (ParamGridBuilder() 
+    .addGrid(lr.regParam, [0.01, 0.1, 1.0])  # List of C values to try
+    .addGrid(lr.elasticNetParam, [0.0, 0.5, 1.0])  # Elastic net parameter values
+    .build())
 
 
+# Define the evaluator
+evaluator = BinaryClassificationEvaluator(labelCol="label", metricName="areaUnderROC")
+
+# Define the cross-validator, which will automatically split the data, fit models, and evaluate them
+cv = CrossValidator(estimator=lr,
+                    estimatorParamMaps=paramGrid,
+                    evaluator=evaluator,
+                    numFolds=5)  # 5-fold cross-validation
+
+# Run the models through the cross-validator, which performs the parameter grid search
+cvModel = cv.fit(train_df)
+
+# Extract the best model from the CrossValidator
+bestModel = cvModel.bestModel
+
+# Predict on the validation data with the best model
+predictions = bestModel.transform(val_df)
+
+# Evaluate the best model's performance on the validation data
+accuracy = evaluator.evaluate(predictions)
+
+# Optionally, print the best regularization parameter
+bestRegParam = bestModel._java_obj.getRegParam()
+print(f"Best regularization parameter: {bestRegParam}")
+print(f"Best model accuracy: {accuracy}")
 
 
-from pyspark.ml import Pipeline
-from pyspark.ml.feature import Tokenizer, HashingTF, IDF, StringIndexer, OneHotEncoder, VectorAssembler, StandardScaler
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-
-# Step 1: Load the test data
-test_df = ss.read.csv("/storage/home/bje5256/work/Project/Test_Balanced.csv", header=True, schema=schema)
-
-test = test_df.dropna()
-
-
-from pyspark.ml.feature import RegexTokenizer, CountVectorizer, IDF, VectorAssembler, StringIndexer, OneHotEncoder
-from pyspark.ml import Pipeline
-from pyspark.sql.functions import udf
-from pyspark.sql.types import IntegerType
-import string
-
-# Assume all initializations and schema definitions are done as per your setup
-
-# Feature engineering functions
-def get_month(dt):
-    return dt.month
-get_month_udf = udf(get_month, IntegerType())
-
-def get_day_of_week(dt):
-    return dt.dayofweek
-get_day_of_week_udf = udf(get_day_of_week, IntegerType())
-
-def get_hour(dt):
-    return dt.hour
-get_hour_udf = udf(get_hour, IntegerType())
-
-def count_punctuations(text):
-    return sum([1 for char in text if char in string.punctuation])
-count_punctuations_udf = udf(count_punctuations, IntegerType())
-
-# Define the stages of the pipeline
-tokenizer_comment = RegexTokenizer(inputCol="comment", outputCol="comment_tokens", pattern="\\W")
-tokenizer_parent_comment = RegexTokenizer(inputCol="parent_comment", outputCol="parent_comment_tokens", pattern="\\W")
-
-hashingTF_comment = HashingTF(inputCol="comment_tokens", outputCol="rawFeatures_comment", numFeatures=2**13)
-hashingTF_parent_comment = HashingTF(inputCol="parent_comment_tokens", outputCol="rawFeatures_parent_comment", numFeatures=2**13)
-
-idf_comment = IDF(inputCol="rawFeatures_comment", outputCol="features_comment")
-idf_parent_comment = IDF(inputCol="rawFeatures_parent_comment", outputCol="features_parent_comment")
-
-# For subreddit, use StringIndexer + OneHotEncoder
-stringIndexer_subreddit = StringIndexer(inputCol="subreddit", outputCol="subredditIndex")
-encoder_subreddit = OneHotEncoder(inputCols=["subredditIndex"], outputCols=["subredditVec"])
-
-# Combine all features into a single vector
-assembler_features = VectorAssembler(inputCols=["features_comment", "features_parent_comment", "subredditVec"], outputCol="features")
-
-# Define the full pipeline
-preprocessingPipeline = Pipeline(stages=[
-    tokenizer_comment, tokenizer_parent_comment,
-    hashingTF_comment, hashingTF_parent_comment,
-    idf_comment, idf_parent_comment,
-    stringIndexer_subreddit, encoder_subreddit,
-    assembler_features
-])
-
-
-# Apply preprocessing transformations to the test data
-transformed_test_data = preprocessingPipeline.fit(test).transform(test)
-
-# Use the trained logistic regression model to make predictions on the preprocessed test data
-test_predictions = lrModel.transform(transformed_test_data)
-
-# Evaluate the model's accuracy on the test data
-evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-test_accuracy = evaluator.evaluate(test_predictions)
-print("Accuracy on test data:", test_accuracy)

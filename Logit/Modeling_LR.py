@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[7]:
+# In[1]:
 
 
 import pyspark
@@ -10,7 +10,7 @@ import pyspark
 # ### Once we import pyspark, we need to use a `SparkContext`.  Every spark program needs a SparkContext object
 # ### In order to use DataFrames, we also need to import `SparkSession` from `pyspark.sql`
 
-# In[8]:
+# In[2]:
 
 
 from pyspark import SparkContext
@@ -25,19 +25,19 @@ from pyspark.sql import Row
 # ## We then create a Spark Session variable (rather than Spark Context) in order to use DataFrame. 
 # - Note: We temporarily use "local" as the parameter for master in this notebook so that we can test it in ICDS Roar Collab.  However, we need to remove "local" as usual to submit it to ICDS in cluster model (here make sure you remove ".master("local")" completely
 
-# In[9]:
+# In[4]:
 
 
-ss=SparkSession.builder.appName("Modeling Logistic Regression").getOrCreate()
+ss=SparkSession.builder.master("local").appName("Modeling Logistic Regression").getOrCreate()
 
 
-# In[10]:
+# In[5]:
 
 
 ss.sparkContext.setCheckpointDir("~/scratch")
 
 
-# In[11]:
+# In[5]:
 
 
 # # Clone repository
@@ -46,7 +46,7 @@ ss.sparkContext.setCheckpointDir("~/scratch")
 
 # ## Load Data
 
-# In[12]:
+# In[6]:
 
 
 schema = StructType([
@@ -64,7 +64,7 @@ schema = StructType([
 ])
 
 
-# In[13]:
+# In[7]:
 
 
 train = ss.read.csv("/storage/home/bje5256/work/Project/Train_Balanced.csv", header=True, schema=schema)
@@ -97,14 +97,14 @@ train = ss.read.csv("/storage/home/bje5256/work/Project/Train_Balanced.csv", hea
 # ## Feature Engineering
 # Now that we have an idea of which variables are more important than the others, we can remove the unnecessary variables and add our feature engineered variables.
 
-# In[14]:
+# In[9]:
 
 
 # Import preprocessing libraries
 from pyspark.sql import functions as F
 
 
-# In[15]:
+# In[10]:
 
 
 # Add date-time variables
@@ -113,7 +113,7 @@ df2 = train.withColumn('month', F.month('created_utc'))            .withColumn('
 # df2.show()
 
 
-# In[16]:
+# In[11]:
 
 
 # Calculate the number of nulls in each row by checking each column
@@ -128,13 +128,13 @@ num_rows_with_nulls = null_sums.filter(F.col('null_sum') > 0).count()
 # print(f"Number of rows with at least one null value: {num_rows_with_nulls}")
 
 
-# In[17]:
+# In[12]:
 
 
 # num_rows_with_nulls/df2.count()
 
 
-# In[18]:
+# In[17]:
 
 
 # df2.count()
@@ -142,14 +142,14 @@ num_rows_with_nulls = null_sums.filter(F.col('null_sum') > 0).count()
 
 # Since the amount of rows with missing values is less than 1%, let's filter out these rows.
 
-# In[19]:
+# In[13]:
 
 
 df3 = df2.dropna()
 # df3.count()
 
 
-# In[20]:
+# In[14]:
 
 
 from pyspark.sql.functions import col, udf
@@ -168,7 +168,7 @@ df3 = df3.withColumn('total_punctuation', count_punctuation_udf(col('comment')))
 # df3.show()
 
 
-# In[21]:
+# In[15]:
 
 
 # Calculate the number of nulls in each row by checking each column
@@ -183,14 +183,14 @@ num_rows_with_nulls = null_sums.filter(F.col('null_sum') > 0).count()
 # print(f"Number of rows with at least one null value: {num_rows_with_nulls}")
 
 
-# In[22]:
+# In[16]:
 
 
 # Drop unnecessary columns
 # df3.columns
 
 
-# In[23]:
+# In[17]:
 
 
 clean_df = df3.select('label', 'comment', 'parent_comment', 'subreddit', 'score', 'month', 'day_of_week', 'hour', 'word_count', 'total_punctuation')
@@ -200,14 +200,14 @@ clean_df = df3.select('label', 'comment', 'parent_comment', 'subreddit', 'score'
 # ## Transformations
 # Now that we have all the necessary features in our `clean_df`, we can start processing the data and performing transformations such as one-hot-encoding and maybe creating tf-idf vectors to input into our traditional machine learning models.
 
-# In[24]:
+# In[18]:
 
 
 # Subreddit value counts
 clean_df.select('subreddit').distinct().count()
 
 
-# In[ ]:
+# In[19]:
 
 
 # Step 1: Group by 'subreddit' and count the entries for each
@@ -222,7 +222,7 @@ number_of_subreddits_less_than_5 = subreddits_less_than_5.count()
 # print(f"Number of subreddits with less than 5 comments: {number_of_subreddits_less_than_5}")
 
 
-# In[ ]:
+# In[20]:
 
 
 from pyspark.sql.functions import col, when
@@ -266,7 +266,7 @@ encoded_df = model.transform(clean_df)
 # encoded_df.show()
 
 
-# In[ ]:
+# In[35]:
 
 
 # encoded_df.select('subredditVec').show()
@@ -278,7 +278,7 @@ encoded_df = model.transform(clean_df)
 # 
 # Value ([1.0]): This indicates the value at the specified index. In the case of one-hot encoding, this will always be 1.0 for the index corresponding to the comment's subreddit, meaning the presence of that subreddit. All other positions in the vector will be 0 (not shown in the sparse vector representation), indicating the absence of those subreddits.
 
-# In[ ]:
+# In[21]:
 
 
 # We can drop the subreddit feature
@@ -320,7 +320,7 @@ transformed_df = encoded_df.drop('subreddit')
 # 16
 #   is a good starting point, but it's always a good idea to experiment with different values if resources permit.
 
-# In[ ]:
+# In[22]:
 
 
 # Now let's create tf-idf vectors for our text comments
@@ -367,13 +367,13 @@ tfidf_df = model.transform(transformed_df)
 # 
 # Hashing and Collisions: Since HashingTF uses a fixed-size vector to represent an potentially unlimited vocabulary, multiple words can end up being hashed to the same index, leading to what's known as a hash collision. While this can introduce some noise into the data, the high dimensionality (e.g., 65536) helps to minimize the impact of these collisions on model performance.
 
-# In[ ]:
+# In[46]:
 
 
 # tfidf_df.show(5)
 
 
-# In[ ]:
+# In[23]:
 
 
 # tfidf_df.columns
@@ -398,7 +398,7 @@ tfidf_df = model.transform(transformed_df)
 # - **`comment_tokens`, `parent_comment_tokens`**: These are intermediate representations used in the process of generating TF-IDF vectors. They're the tokenized lists of words from the comments and are not usually used directly in modeling once we have the TF-IDF vectors.
 # - **`rawFeatures_comment`, `rawFeatures_parent_comment`**: These represent the hashed feature vectors (before applying IDF) and are intermediate steps towards generating the `features_comment` and `features_parent_comment` TF-IDF vectors. We would typically use the final TF-IDF vectors for modeling, not these intermediate hash vectors.
 
-# In[ ]:
+# In[24]:
 
 
 # Now we can drop the comment and parent comment since they are represented as tf-idf vectors
@@ -406,7 +406,7 @@ final_df = tfidf_df.select('features_comment', 'features_parent_comment', 'subre
 # final_df.columns
 
 
-# In[ ]:
+# In[25]:
 
 
 # final_df.show()
@@ -416,7 +416,7 @@ final_df = tfidf_df.select('features_comment', 'features_parent_comment', 'subre
 
 # # Scaling and Splitting
 
-# In[ ]:
+# In[26]:
 
 
 from pyspark.ml.feature import VectorAssembler
@@ -429,7 +429,7 @@ assembler = VectorAssembler(inputCols=numericCols, outputCol="numeric_features")
 final_df = assembler.transform(final_df)
 
 
-# In[ ]:
+# In[27]:
 
 
 from pyspark.ml.feature import StandardScaler
@@ -440,13 +440,13 @@ scalerModel = scaler.fit(final_df)
 final_df = scalerModel.transform(final_df)
 
 
-# In[ ]:
+# In[29]:
 
 
 # final_df.columns
 
 
-# In[ ]:
+# In[30]:
 
 
 scaled_df = final_df.select('features_comment', 
@@ -457,7 +457,7 @@ scaled_df = final_df.select('features_comment',
 # scaled_df.show(5)
 
 
-# In[ ]:
+# In[33]:
 
 
 train_df, val_df = scaled_df.randomSplit([0.8, 0.2], seed=22)
@@ -477,81 +477,9 @@ val_cols = len(val_df.columns)
 # In[34]:
 
 
-# from pyspark.ml.feature import VectorAssembler
-
-# assembler = VectorAssembler(inputCols=["features_comment", "features_parent_comment"], outputCol="features")
-
-# # Transform the dataset to include a new column 'features' that combines 'features_comment' and 'features_parent_comment'
-# combined_df = assembler.transform(scaled_df)
-
-# # Split the data into training and validation sets
-# train_df, val_df = combined_df.randomSplit([0.8, 0.2], seed=22)
-
-
-# # In[35]:
-
-
-# from pyspark.ml.classification import LogisticRegression
-
-# # Initialize the logistic regression model
-# lr = LogisticRegression(featuresCol='features', labelCol='label')
-
-# # Fit the model on the training data
-# lrModel = lr.fit(train_df)
-
-
-# # In[37]:
-
-
-# from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-# from pyspark.mllib.evaluation import MulticlassMetrics
-# from pyspark.sql.functions import col
-
-# # Predict on the validation data
-# predictions = lrModel.transform(val_df)
-
-# # Select (prediction, true label) and compute test error
-# evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-# accuracy = evaluator.evaluate(predictions)
-# print(f"Model Accuracy: {accuracy}")
-
-
-# # In[38]:
-
-
-# from pyspark.sql.types import FloatType
-
-# # Convert predictions and labels to float type
-# predictions = predictions.withColumn("label", predictions["label"].cast(FloatType()))
-# predictions = predictions.withColumn("prediction", predictions["prediction"].cast(FloatType()))
-
-# # Prepare the RDD required for MulticlassMetrics
-# predictionAndLabels = predictions.select("prediction", "label").rdd.map(lambda r: (float(r[0]), float(r[1])))
-
-# # Instantiate metrics object
-# metrics = MulticlassMetrics(predictionAndLabels)
-
-# # Calculate precision, recall, and F1 Score
-# precision = metrics.precision(1.0)
-# recall = metrics.recall(1.0)
-# f1Score = metrics.fMeasure(1.0, beta=1.0)
-
-# print(f"Precision: {precision}")
-# print(f"Recall: {recall}")
-# print(f"F1 Score: {f1Score}")
-
-
-# # # Text + Non-Text Covars
-
-# # In[ ]:
-
-
 from pyspark.ml.feature import VectorAssembler
 
-assembler = VectorAssembler(inputCols=['features_comment', 
-                            'features_parent_comment', 
-                            'subredditVec', 
-                            'scaled_numeric_features'], outputCol="features")
+assembler = VectorAssembler(inputCols=["features_comment", "features_parent_comment"], outputCol="features")
 
 # Transform the dataset to include a new column 'features' that combines 'features_comment' and 'features_parent_comment'
 combined_df = assembler.transform(scaled_df)
@@ -560,101 +488,55 @@ combined_df = assembler.transform(scaled_df)
 train_df, val_df = combined_df.randomSplit([0.8, 0.2], seed=22)
 
 
-# In[ ]:
+# In[35]:
 
-# Train Logistic Regression on Best lambda value found from hyperparameter tuning
 
 from pyspark.ml.classification import LogisticRegression
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 
-# Initialize the logistic regression model with the best regularization parameter
-lr = LogisticRegression(featuresCol='features', labelCol='label', regParam=0.1)
+# Initialize the logistic regression model
+lr = LogisticRegression(featuresCol='features', labelCol='label')
 
-# Fit the model on your training data
+# Fit the model on the training data
 lrModel = lr.fit(train_df)
+
+
+# In[37]:
+
+
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.mllib.evaluation import MulticlassMetrics
+from pyspark.sql.functions import col
 
 # Predict on the validation data
 predictions = lrModel.transform(val_df)
 
-# Evaluate the model's performance using accuracy
-accuracy_evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-accuracy = accuracy_evaluator.evaluate(predictions)
-print(f"Validation accuracy with regParam=0.1: {accuracy}")
-
-# Test accuracy
-
-
-
-
-from pyspark.ml import Pipeline
-from pyspark.ml.feature import Tokenizer, HashingTF, IDF, StringIndexer, OneHotEncoder, VectorAssembler, StandardScaler
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-
-# Step 1: Load the test data
-test_df = ss.read.csv("/storage/home/bje5256/work/Project/Test_Balanced.csv", header=True, schema=schema)
-
-test = test_df.dropna()
-
-
-from pyspark.ml.feature import RegexTokenizer, CountVectorizer, IDF, VectorAssembler, StringIndexer, OneHotEncoder
-from pyspark.ml import Pipeline
-from pyspark.sql.functions import udf
-from pyspark.sql.types import IntegerType
-import string
-
-# Assume all initializations and schema definitions are done as per your setup
-
-# Feature engineering functions
-def get_month(dt):
-    return dt.month
-get_month_udf = udf(get_month, IntegerType())
-
-def get_day_of_week(dt):
-    return dt.dayofweek
-get_day_of_week_udf = udf(get_day_of_week, IntegerType())
-
-def get_hour(dt):
-    return dt.hour
-get_hour_udf = udf(get_hour, IntegerType())
-
-def count_punctuations(text):
-    return sum([1 for char in text if char in string.punctuation])
-count_punctuations_udf = udf(count_punctuations, IntegerType())
-
-# Define the stages of the pipeline
-tokenizer_comment = RegexTokenizer(inputCol="comment", outputCol="comment_tokens", pattern="\\W")
-tokenizer_parent_comment = RegexTokenizer(inputCol="parent_comment", outputCol="parent_comment_tokens", pattern="\\W")
-
-hashingTF_comment = HashingTF(inputCol="comment_tokens", outputCol="rawFeatures_comment", numFeatures=2**13)
-hashingTF_parent_comment = HashingTF(inputCol="parent_comment_tokens", outputCol="rawFeatures_parent_comment", numFeatures=2**13)
-
-idf_comment = IDF(inputCol="rawFeatures_comment", outputCol="features_comment")
-idf_parent_comment = IDF(inputCol="rawFeatures_parent_comment", outputCol="features_parent_comment")
-
-# For subreddit, use StringIndexer + OneHotEncoder
-stringIndexer_subreddit = StringIndexer(inputCol="subreddit", outputCol="subredditIndex")
-encoder_subreddit = OneHotEncoder(inputCols=["subredditIndex"], outputCols=["subredditVec"])
-
-# Combine all features into a single vector
-assembler_features = VectorAssembler(inputCols=["features_comment", "features_parent_comment", "subredditVec"], outputCol="features")
-
-# Define the full pipeline
-preprocessingPipeline = Pipeline(stages=[
-    tokenizer_comment, tokenizer_parent_comment,
-    hashingTF_comment, hashingTF_parent_comment,
-    idf_comment, idf_parent_comment,
-    stringIndexer_subreddit, encoder_subreddit,
-    assembler_features
-])
-
-
-# Apply preprocessing transformations to the test data
-transformed_test_data = preprocessingPipeline.fit(test).transform(test)
-
-# Use the trained logistic regression model to make predictions on the preprocessed test data
-test_predictions = lrModel.transform(transformed_test_data)
-
-# Evaluate the model's accuracy on the test data
+# Select (prediction, true label) and compute test error
 evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction", metricName="accuracy")
-test_accuracy = evaluator.evaluate(test_predictions)
-print("Accuracy on test data:", test_accuracy)
+accuracy = evaluator.evaluate(predictions)
+print(f"Model Accuracy: {accuracy}")
+
+
+# In[38]:
+
+
+from pyspark.sql.types import FloatType
+
+# Convert predictions and labels to float type
+predictions = predictions.withColumn("label", predictions["label"].cast(FloatType()))
+predictions = predictions.withColumn("prediction", predictions["prediction"].cast(FloatType()))
+
+# Prepare the RDD required for MulticlassMetrics
+predictionAndLabels = predictions.select("prediction", "label").rdd.map(lambda r: (float(r[0]), float(r[1])))
+
+# Instantiate metrics object
+metrics = MulticlassMetrics(predictionAndLabels)
+
+# Calculate precision, recall, and F1 Score
+precision = metrics.precision(1.0)
+recall = metrics.recall(1.0)
+f1Score = metrics.fMeasure(1.0, beta=1.0)
+
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"F1 Score: {f1Score}")
+
