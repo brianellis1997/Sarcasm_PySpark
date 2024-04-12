@@ -19,3 +19,6 @@ attempts, there is still a need for further research and implementation in this 
 ## Inference
 It would be nice to quantify the model's confidence in it's classification. For example, instead of outputting binary sarcastic labels, it can give probabilistic estimates such as 70% sarcasm.
 It might also be good to use traditional models like logistic regression and random forest to tell us what words or phrases they value when making a classification.
+
+
+![Scale Plot](/Screenshot%202024-04-12%20at%201.35.34%20PM.png)
